@@ -66,9 +66,14 @@ enum {
 @property (nonatomic, readonly) NSBundle *bundle;
 
 /**
- Returns YES if any concrete subclass requires a migration.
+ Returns YES if any concrete subclass requires a migration that has been registered with +[SLCoreDataStack registerSubclass:].
  */
 + (BOOL)subclassesRequireMigration;
+
+/**
+ Registers a concrete subclass
+ */
++ (void)registerConcreteSubclass:(Class)subclass;
 
 /**
  Runs each available migration on its own an a different thread.

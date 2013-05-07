@@ -30,35 +30,6 @@
 
 NSString *const SLCoreDataStackErrorDomain = @"SLCoreDataStackErrorDomain";
 
-static void enumerateSubclasses(Class class, void(^enumerator)(Class class))
-{
-    NSCAssert(enumerator != NULL, @"no enumerator specified");
-    
-    static dispatch_queue_t queue = NULL;
-    
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        queue = dispatch_queue_create("de.SLCoreDataStack.subclass-enumeration-queue", DISPATCH_QUEUE_CONCURRENT);
-    });
-    
-    unsigned int numberOfClasses = 0;
-    Class *classList = objc_copyClassList(&numberOfClasses);
-    
-    dispatch_apply(numberOfClasses, queue, ^(size_t classIndex) {
-        Class thisClass = classList[classIndex];
-        Class superClass = thisClass;
-        
-        while ((superClass = class_getSuperclass(superClass))) {
-            if (superClass == class) {
-                enumerator(thisClass);
-            }
-        }
-    });
-    
-    // cleanup
-    free(classList);
-}
-
 
 
 @interface SLCoreDataStack ()
@@ -180,14 +151,37 @@ static void enumerateSubclasses(Class class, void(^enumerator)(Class class))
 {
     __block BOOL subclassesRequireMigration = NO;
     
-    enumerateSubclasses([SLCoreDataStack class], ^(__unsafe_unretained Class class) {
+    for (NSString *className in [self _concreteSubclasses]) {
+        Class class = NSClassFromString(className);
+        
         SLCoreDataStack *manager = [class sharedInstance];
         if (manager.requiresMigration) {
             subclassesRequireMigration = YES;
         }
-    });
+    }
     
     return subclassesRequireMigration;
+}
+
++ (void)registerConcreteSubclass:(Class)subclass
+{
+    NSParameterAssert(subclass);
+    NSAssert([subclass isSubclassOfClass:[SLCoreDataStack class]], @"%@ needs to be a concrete subclass of SLCoreDataStack", subclass);
+    NSAssert(subclass != [SLCoreDataStack class], @"%@ needs to be a concrete subclass of SLCoreDataStack", subclass);
+    
+    [[self _concreteSubclasses] addObject:NSStringFromClass(subclass)];
+}
+
++ (NSMutableSet *)_concreteSubclasses
+{
+    static NSMutableSet *set = nil;
+    
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        set = [NSMutableSet set];
+    });
+    
+    return set;
 }
 
 + (void)migrateSubclassesWithProgressHandler:(void(^)(SLCoreDataStack *currentMigratingSubclass))progressHandler
@@ -201,12 +195,15 @@ static void enumerateSubclasses(Class class, void(^enumerator)(Class class))
     });
     
     NSMutableArray *requiresSubclasses = [NSMutableArray array];
-    enumerateSubclasses([SLCoreDataStack class], ^(__unsafe_unretained Class class) {
+    
+    for (NSString *className in [self _concreteSubclasses]) {
+        Class class = NSClassFromString(className);
+        
         SLCoreDataStack *manager = [class sharedInstance];
         if (manager.requiresMigration) {
             [requiresSubclasses addObject:manager];
         }
-    });
+    }
     
     NSUInteger count = requiresSubclasses.count;
     [requiresSubclasses enumerateObjectsUsingBlock:^(SLCoreDataStack *manager, NSUInteger idx, BOOL *stop) {
