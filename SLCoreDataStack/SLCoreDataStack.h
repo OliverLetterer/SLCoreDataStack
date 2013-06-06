@@ -44,6 +44,12 @@ enum {
 @property (nonatomic, strong) NSManagedObjectContext *backgroundThreadManagedObjectContext;
 
 /**
+ Merge policies which will be applied to mainThreadManagedObjectContext and backgroundThreadManagedObjectContext.
+ */
+@property (nonatomic, readonly) id mainThreadMergePolicy;
+@property (nonatomic, readonly) id backgroundThreadMergePolicy;
+
+/**
  Return the name for your CoreData model here.
  
  @warning Must be overwritten.

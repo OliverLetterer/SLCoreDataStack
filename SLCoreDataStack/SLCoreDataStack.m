@@ -47,6 +47,16 @@ NSString *const SLCoreDataStackErrorDomain = @"SLCoreDataStackErrorDomain";
 
 #pragma mark - setters and getters
 
+- (id)mainThreadMergePolicy
+{
+    return NSMergeByPropertyObjectTrumpMergePolicy;
+}
+
+- (id)backgroundThreadMergePolicy
+{
+    return NSMergeByPropertyObjectTrumpMergePolicy;
+}
+
 - (NSString *)managedObjectModelName
 {
     [self doesNotRecognizeSelector:_cmd];
@@ -247,6 +257,7 @@ NSString *const SLCoreDataStackErrorDomain = @"SLCoreDataStackErrorDomain";
     if (!_mainThreadManagedObjectContext) {
         _mainThreadManagedObjectContext = [[NSManagedObjectContext alloc] initWithConcurrencyType:NSMainQueueConcurrencyType];
         _mainThreadManagedObjectContext.persistentStoreCoordinator = self.persistentStoreCoordinator;
+        _mainThreadManagedObjectContext.mergePolicy = self.mainThreadMergePolicy;
         
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(_managedObjectContextDidSaveNotificationCallback:) name:NSManagedObjectContextDidSaveNotification object:_mainThreadManagedObjectContext];
     }
@@ -270,6 +281,7 @@ NSString *const SLCoreDataStackErrorDomain = @"SLCoreDataStackErrorDomain";
     if (!_backgroundThreadManagedObjectContext) {
         _backgroundThreadManagedObjectContext = [[NSManagedObjectContext alloc] initWithConcurrencyType:NSPrivateQueueConcurrencyType];
         _backgroundThreadManagedObjectContext.persistentStoreCoordinator = self.persistentStoreCoordinator;
+        _backgroundThreadManagedObjectContext.mergePolicy = self.backgroundThreadMergePolicy;
         
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(_managedObjectContextDidSaveNotificationCallback:) name:NSManagedObjectContextDidSaveNotification object:_backgroundThreadManagedObjectContext];
     }
