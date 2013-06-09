@@ -155,6 +155,13 @@ NSString *const SLCoreDataStackErrorDomain = @"SLCoreDataStackErrorDomain";
     return self;
 }
 
+#pragma mark - Memory management
+
+- (void)dealloc
+{
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
+}
+
 #pragma mark - Class methods
 
 + (BOOL)subclassesRequireMigration
