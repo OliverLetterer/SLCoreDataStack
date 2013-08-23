@@ -44,6 +44,11 @@ enum {
 @property (nonatomic, strong) NSManagedObjectContext *backgroundThreadManagedObjectContext;
 
 /**
+ returns a new NSManagedObjectContext instance which is observed by this CoreData stack and automatically merges changes between all other observing contexts. Observation ends iff the NSManagedObjectContext gets dealloced.
+ */
+- (NSManagedObjectContext *)newManagedObjectContextWithConcurrencyType:(NSManagedObjectContextConcurrencyType)concurrencyType;
+
+/**
  Merge policies which will be applied to mainThreadManagedObjectContext and backgroundThreadManagedObjectContext.
  */
 @property (nonatomic, readonly) id mainThreadMergePolicy;

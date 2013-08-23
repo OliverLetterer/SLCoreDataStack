@@ -26,13 +26,83 @@
 #import "SLCoreDataStack.h"
 #import <objc/runtime.h>
 
+static void class_swizzleSelector(Class class, SEL originalSelector, SEL newSelector)
+{
+    Method origMethod = class_getInstanceMethod(class, originalSelector);
+    Method newMethod = class_getInstanceMethod(class, newSelector);
+    if(class_addMethod(class, originalSelector, method_getImplementation(newMethod), method_getTypeEncoding(newMethod))) {
+        class_replaceMethod(class, newSelector, method_getImplementation(origMethod), method_getTypeEncoding(origMethod));
+    } else {
+        method_exchangeImplementations(origMethod, newMethod);
+    }
+}
+
 
 
 NSString *const SLCoreDataStackErrorDomain = @"SLCoreDataStackErrorDomain";
 
+@interface NSManagedObjectContext (SLCoreDataStack)
+
+@property (nonatomic, strong) NSMutableArray *SLCoreDataStack_deallocationHandlers;
+- (void)SLCoreDataStack_addDeallocationHandler:(void(^)(__unsafe_unretained NSManagedObjectContext *context))handler;
+
+@end
+
+@implementation NSManagedObjectContext (SLCoreDataStack)
+
+#pragma mark - setters and getters
+
+- (NSMutableArray *)SLCoreDataStack_deallocationHandlers
+{
+    return objc_getAssociatedObject(self, @selector(SLCoreDataStack_deallocationHandlers));
+}
+
+- (void)setSLCoreDataStack_deallocationHandlers:(NSMutableArray *)SLCoreDataStack_deallocationHandlers
+{
+    objc_setAssociatedObject(self, @selector(SLCoreDataStack_deallocationHandlers), SLCoreDataStack_deallocationHandlers, OBJC_ASSOCIATION_RETAIN);
+}
+
+#pragma mark - instance methods
+
+- (void)SLCoreDataStack_addDeallocationHandler:(void(^)(__unsafe_unretained NSManagedObjectContext *context))handler
+{
+    [self.SLCoreDataStack_deallocationHandlers addObject:handler];
+}
+
+#pragma mark - Hooked implementations
+
++ (void)load
+{
+    class_swizzleSelector(self, @selector(initWithConcurrencyType:), @selector(__SLCoreDataStackInitWithConcurrencyType:));
+    class_swizzleSelector(self, NSSelectorFromString(@"dealloc"), @selector(__SLCoreDataStackDealloc));
+}
+
+- (id)__SLCoreDataStackInitWithConcurrencyType:(NSManagedObjectContextConcurrencyType)ct __attribute__((objc_method_family(init)))
+{
+    if ((self = [self __SLCoreDataStackInitWithConcurrencyType:ct])) {
+        self.SLCoreDataStack_deallocationHandlers = [NSMutableArray array];
+    }
+    
+    return self;
+}
+
+- (void)__SLCoreDataStackDealloc
+{
+    for (id uncastedHandler in self.SLCoreDataStack_deallocationHandlers) {
+        void(^handler)(__unsafe_unretained NSManagedObjectContext *context) = uncastedHandler;
+        handler(self);
+    }
+    
+    [self __SLCoreDataStackDealloc];
+}
+
+@end
+
 
 
 @interface SLCoreDataStack ()
+
+@property (nonatomic, strong) NSPointerArray *observingManagedObjectContexts;
 
 @property (nonatomic, readonly) NSURL *_dataStoreRootURL;
 @property (nonatomic, readonly) BOOL requiresMigration;
@@ -142,6 +212,8 @@ NSString *const SLCoreDataStackErrorDomain = @"SLCoreDataStackErrorDomain";
 - (id)init
 {
     if (self = [super init]) {
+        _observingManagedObjectContexts = [NSPointerArray pointerArrayWithOptions:NSPointerFunctionsWeakMemory];
+        
         [[NSNotificationCenter defaultCenter] addObserver:self
                                                  selector:@selector(_automaticallySaveDataStore)
                                                      name:UIApplicationWillTerminateNotification
@@ -343,7 +415,65 @@ NSString *const SLCoreDataStackErrorDomain = @"SLCoreDataStackErrorDomain";
     return _persistentStoreCoordinator;
 }
 
+- (NSManagedObjectContext *)newManagedObjectContextWithConcurrencyType:(NSManagedObjectContextConcurrencyType)concurrencyType
+{
+    NSManagedObjectContext *context = [[NSManagedObjectContext alloc] initWithConcurrencyType:concurrencyType];
+    context.persistentStoreCoordinator = self.persistentStoreCoordinator;
+    context.mergePolicy = self.backgroundThreadMergePolicy;
+    
+    [self.observingManagedObjectContexts addPointer:(__bridge void *)context];
+    
+    __weak typeof(self) weakSelf = self;
+    [context SLCoreDataStack_addDeallocationHandler:^(NSManagedObjectContext *__unsafe_unretained context) {
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        
+        NSUInteger index = NSNotFound;
+        
+        for (NSUInteger i = 0; i < strongSelf.observingManagedObjectContexts.count; i++) {
+            void *pointer = [strongSelf.observingManagedObjectContexts pointerAtIndex:i];
+            
+            if (pointer == (__bridge void *)context) {
+                index = i;
+                break;
+            }
+        }
+        
+        if (index != NSNotFound) {
+            [strongSelf.observingManagedObjectContexts removePointerAtIndex:index];
+        }
+        
+        [[NSNotificationCenter defaultCenter] removeObserver:self name:NSManagedObjectContextDidSaveNotification object:context];
+    }];
+    
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(_managedObjectContextDidSaveNotificationCallback:) name:NSManagedObjectContextDidSaveNotification object:context];
+    
+    return context;
+}
+
 #pragma mark - private implementation ()
+
+- (NSArray *)_observingManagedObjectsContexts
+{
+    NSMutableArray *observingManagedObjectsContexts = [NSMutableArray array];
+    
+    NSManagedObjectContext *mainThreadManagedObjectContext = self.mainThreadManagedObjectContext;
+    if (mainThreadManagedObjectContext) {
+        [observingManagedObjectsContexts addObject:mainThreadManagedObjectContext];
+    }
+    
+    NSManagedObjectContext *backgroundThreadManagedObjectContext = self.backgroundThreadManagedObjectContext;
+    if (backgroundThreadManagedObjectContext) {
+        [observingManagedObjectsContexts addObject:backgroundThreadManagedObjectContext];
+    }
+    
+    for (NSManagedObjectContext *context in self.observingManagedObjectContexts) {
+        if (context) {
+            [observingManagedObjectsContexts addObject:context];
+        }
+    }
+    
+    return observingManagedObjectsContexts;
+}
 
 - (BOOL)_performMigrationFromDataStoreAtURL:(NSURL *)dataStoreURL
                          toDestinationModel:(NSManagedObjectModel *)destinationModel
@@ -452,7 +582,7 @@ NSString *const SLCoreDataStackErrorDomain = @"SLCoreDataStackErrorDomain";
 {
     NSManagedObjectContext *changedContext = notification.object;
     
-    for (NSManagedObjectContext *otherContext in @[ self.mainThreadManagedObjectContext, self.backgroundThreadManagedObjectContext ]) {
+    for (NSManagedObjectContext *otherContext in [self _observingManagedObjectsContexts]) {
         if (changedContext.persistentStoreCoordinator == otherContext.persistentStoreCoordinator && otherContext != changedContext) {
             [otherContext performBlock:^{
                 [otherContext mergeChangesFromContextDidSaveNotification:notification];
@@ -463,7 +593,7 @@ NSString *const SLCoreDataStackErrorDomain = @"SLCoreDataStackErrorDomain";
 
 - (void)_automaticallySaveDataStore
 {
-    for (NSManagedObjectContext *context in @[ self.mainThreadManagedObjectContext, self.backgroundThreadManagedObjectContext ]) {
+    for (NSManagedObjectContext *context in [self _observingManagedObjectsContexts]) {
         if (!context.hasChanges) {
             continue;
         }
