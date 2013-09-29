@@ -95,6 +95,6 @@ enum {
 /**
  Return YES if you want to assert cases where you access NSManagedObjects on the wrong thread. Defaults to NO and can only be used if DEBUG is defined.
  */
-+ (BOOL)CoreDataThreadDebuggingEnabled;
++ (BOOL)coreDataThreadDebuggingEnabled;
 
 @end

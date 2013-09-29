@@ -262,7 +262,7 @@ NSString *const SLCoreDataStackErrorDomain = @"SLCoreDataStackErrorDomain";
     [[self _concreteSubclasses] addObject:NSStringFromClass(subclass)];
 }
 
-+ (BOOL)CoreDataThreadDebuggingEnabled
++ (BOOL)coreDataThreadDebuggingEnabled
 {
     return NO;
 }
@@ -661,11 +661,11 @@ NSString *const SLCoreDataStackErrorDomain = @"SLCoreDataStackErrorDomain";
 
 + (void)load
 {
-    class_swizzleSelector(self, @selector(willChangeValueForKey:), @selector(__iCuisineAPIWillChangeValueForKey:));
-    class_swizzleSelector(self, @selector(willAccessValueForKey:), @selector(__iCuisineAPIWillAccessValueForKey:));
+    class_swizzleSelector(self, @selector(willChangeValueForKey:), @selector(__SLCoreDataStackCoreDataThreadDebuggingWillChangeValueForKey:));
+    class_swizzleSelector(self, @selector(willAccessValueForKey:), @selector(__SLCoreDataStackCoreDataThreadDebuggingWillAccessValueForKey:));
 }
 
-- (void)__iCuisineAPIWillAccessValueForKey:(NSString *)key
+- (void)__SLCoreDataStackCoreDataThreadDebuggingWillAccessValueForKey:(NSString *)key
 {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
@@ -682,10 +682,10 @@ NSString *const SLCoreDataStackErrorDomain = @"SLCoreDataStackErrorDomain";
     
 #pragma clang diagnostic pop
     
-    [self __iCuisineAPIWillAccessValueForKey:key];
+    [self __SLCoreDataStackCoreDataThreadDebuggingWillAccessValueForKey:key];
 }
 
-- (void)__iCuisineAPIWillChangeValueForKey:(NSString *)key
+- (void)__SLCoreDataStackCoreDataThreadDebuggingWillChangeValueForKey:(NSString *)key
 {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
@@ -702,7 +702,7 @@ NSString *const SLCoreDataStackErrorDomain = @"SLCoreDataStackErrorDomain";
     
 #pragma clang diagnostic pop
     
-    [self __iCuisineAPIWillChangeValueForKey:key];
+    [self __SLCoreDataStackCoreDataThreadDebuggingWillChangeValueForKey:key];
 }
 
 @end
