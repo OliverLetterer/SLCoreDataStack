@@ -419,7 +419,7 @@ NSString *const SLCoreDataStackErrorDomain = @"SLCoreDataStackErrorDomain";
     }
     
 #ifdef DEBUG
-    if ([self.class CoreDataThreadDebuggingEnabled]) {
+    if ([self.class coreDataThreadDebuggingEnabled]) {
         [self _enableCoreDataThreadDebugging];
     }
 #endif
