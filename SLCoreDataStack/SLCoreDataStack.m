@@ -25,6 +25,7 @@
 
 #import "SLCoreDataStack.h"
 #import <objc/runtime.h>
+#import <objc/message.h>
 
 static void class_swizzleSelector(Class class, SEL originalSelector, SEL newSelector)
 {
@@ -261,6 +262,11 @@ NSString *const SLCoreDataStackErrorDomain = @"SLCoreDataStackErrorDomain";
     [[self _concreteSubclasses] addObject:NSStringFromClass(subclass)];
 }
 
++ (BOOL)CoreDataThreadDebuggingEnabled
+{
+    return NO;
+}
+
 + (NSMutableSet *)_concreteSubclasses
 {
     static NSMutableSet *set = nil;
@@ -411,6 +417,12 @@ NSString *const SLCoreDataStackErrorDomain = @"SLCoreDataStackErrorDomain";
             }
         }
     }
+    
+#ifdef DEBUG
+    if ([self.class CoreDataThreadDebuggingEnabled]) {
+        [self _enableCoreDataThreadDebugging];
+    }
+#endif
     
     return _persistentStoreCoordinator;
 }
@@ -607,4 +619,91 @@ NSString *const SLCoreDataStackErrorDomain = @"SLCoreDataStackErrorDomain";
     }
 }
 
+- (void)_enableCoreDataThreadDebugging
+{
+    @synchronized(self) {
+        NSManagedObjectModel *model = _persistentStoreCoordinator.managedObjectModel;
+        
+        for (NSEntityDescription *entity in model.entities) {
+            Class class = NSClassFromString(entity.managedObjectClassName);
+            
+            if (!class || objc_getAssociatedObject(class, _cmd)) {
+                continue;
+            }
+            
+            IMP implementation = imp_implementationWithBlock(^(id _self, NSString *key) {
+                struct objc_super super = {
+                    .receiver = _self,
+                    .super_class = [_self superclass]
+                };
+                ((void(*)(struct objc_super *, SEL, id))objc_msgSendSuper)(&super, @selector(willAccessValueForKey:), key);
+            });
+            class_addMethod(class, @selector(willAccessValueForKey:), implementation, "v@:@");
+            
+            implementation = imp_implementationWithBlock(^(id _self, NSString *key) {
+                struct objc_super super = {
+                    .receiver = _self,
+                    .super_class = [_self superclass]
+                };
+                ((void(*)(struct objc_super *, SEL, id))objc_msgSendSuper)(&super, @selector(willChangeValueForKey:), key);
+            });
+            class_addMethod(class, @selector(willChangeValueForKey:), implementation, "v@:@");
+            
+            objc_setAssociatedObject(class, _cmd, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        }
+    }
+}
+
 @end
+
+#ifdef DEBUG
+@implementation NSManagedObject (SLCoreDataStackCoreDataThreadDebugging)
+
++ (void)load
+{
+    class_swizzleSelector(self, @selector(willChangeValueForKey:), @selector(__iCuisineAPIWillChangeValueForKey:));
+    class_swizzleSelector(self, @selector(willAccessValueForKey:), @selector(__iCuisineAPIWillAccessValueForKey:));
+}
+
+- (void)__iCuisineAPIWillAccessValueForKey:(NSString *)key
+{
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+    NSManagedObjectContext *context = self.managedObjectContext;
+    
+    if (context) {
+        __block dispatch_queue_t queue = NULL;
+        [context performBlockAndWait:^{
+            queue = dispatch_get_current_queue();
+        }];
+        
+        NSAssert(queue == dispatch_get_current_queue(), @"wrong queue buddy");
+    }
+    
+#pragma clang diagnostic pop
+    
+    [self __iCuisineAPIWillAccessValueForKey:key];
+}
+
+- (void)__iCuisineAPIWillChangeValueForKey:(NSString *)key
+{
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+    NSManagedObjectContext *context = self.managedObjectContext;
+    
+    if (context) {
+        __block dispatch_queue_t queue = NULL;
+        [context performBlockAndWait:^{
+            queue = dispatch_get_current_queue();
+        }];
+        
+        NSAssert(queue == dispatch_get_current_queue(), @"wrong queue buddy");
+    }
+    
+#pragma clang diagnostic pop
+    
+    [self __iCuisineAPIWillChangeValueForKey:key];
+}
+
+@end
+#endif
