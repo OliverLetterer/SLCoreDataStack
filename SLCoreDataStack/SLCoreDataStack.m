@@ -634,7 +634,7 @@ NSString *const SLCoreDataStackErrorDomain = @"SLCoreDataStackErrorDomain";
             IMP implementation = imp_implementationWithBlock(^(id _self, NSString *key) {
                 struct objc_super super = {
                     .receiver = _self,
-                    .super_class = [_self superclass]
+                    .super_class = [class superclass]
                 };
                 ((void(*)(struct objc_super *, SEL, id))objc_msgSendSuper)(&super, @selector(willAccessValueForKey:), key);
             });
@@ -643,7 +643,7 @@ NSString *const SLCoreDataStackErrorDomain = @"SLCoreDataStackErrorDomain";
             implementation = imp_implementationWithBlock(^(id _self, NSString *key) {
                 struct objc_super super = {
                     .receiver = _self,
-                    .super_class = [_self superclass]
+                    .super_class = [class superclass]
                 };
                 ((void(*)(struct objc_super *, SEL, id))objc_msgSendSuper)(&super, @selector(willChangeValueForKey:), key);
             });
