@@ -39,6 +39,7 @@ enum {
 
 @property (nonatomic, strong) NSManagedObjectModel *managedObjectModel;
 @property (nonatomic, strong) NSPersistentStoreCoordinator *persistentStoreCoordinator;
+@property (nonatomic, readonly) NSString *storeType;
 
 @property (nonatomic, strong) NSManagedObjectContext *mainThreadManagedObjectContext;
 @property (nonatomic, strong) NSManagedObjectContext *backgroundThreadManagedObjectContext;

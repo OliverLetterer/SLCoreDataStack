@@ -390,41 +390,46 @@ NSString *const SLCoreDataStackErrorDomain = @"SLCoreDataStackErrorDomain";
     if (!_persistentStoreCoordinator) {
         NSURL *storeURL = self.dataStoreURL;
         NSManagedObjectModel *managedObjectModel = self.managedObjectModel;
-        
+
         NSDictionary *options = @{
                                   NSMigratePersistentStoresAutomaticallyOption: @YES,
                                   NSInferMappingModelAutomaticallyOption: @YES
                                   };
-        
+
         NSError *error = nil;
         _persistentStoreCoordinator = [[NSPersistentStoreCoordinator alloc] initWithManagedObjectModel:managedObjectModel];
-        if (![_persistentStoreCoordinator addPersistentStoreWithType:NSSQLiteStoreType configuration:nil URL:storeURL options:options error:&error]) {
+        if (![_persistentStoreCoordinator addPersistentStoreWithType:self.storeType configuration:nil URL:storeURL options:options error:&error]) {
             error = nil;
             // first try to migrate to the new store
             if (![self _performMigrationFromDataStoreAtURL:storeURL toDestinationModel:managedObjectModel error:&error]) {
                 // migration was not successful => delete database and continue
                 [[NSFileManager defaultManager] removeItemAtURL:storeURL error:NULL];
-                
-                if (![_persistentStoreCoordinator addPersistentStoreWithType:NSSQLiteStoreType configuration:nil URL:storeURL options:nil error:&error]) {
+
+                if (![_persistentStoreCoordinator addPersistentStoreWithType:self.storeType configuration:nil URL:storeURL options:nil error:&error]) {
                     NSAssert(NO, @"Could not add persistent store: %@", error);
                 }
             } else {
                 // migration was successful, just add the store
-                if (![_persistentStoreCoordinator addPersistentStoreWithType:NSSQLiteStoreType configuration:nil URL:storeURL options:nil error:&error]) {
+                if (![_persistentStoreCoordinator addPersistentStoreWithType:self.storeType configuration:nil URL:storeURL options:nil error:&error]) {
                     // unable to add store, fail
                     NSAssert(NO, @"Could not add persistent store: %@", error);
                 }
             }
         }
     }
-    
+
 #ifdef DEBUG
     if ([self.class coreDataThreadDebuggingEnabled]) {
         [self _enableCoreDataThreadDebugging];
     }
 #endif
-    
+
     return _persistentStoreCoordinator;
+}
+
+- (NSString *)storeType
+{
+    return NSSQLiteStoreType;
 }
 
 - (NSManagedObjectContext *)newManagedObjectContextWithConcurrencyType:(NSManagedObjectContextConcurrencyType)concurrencyType
