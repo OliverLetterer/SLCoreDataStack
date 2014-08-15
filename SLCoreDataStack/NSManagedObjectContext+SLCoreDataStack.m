@@ -24,7 +24,7 @@
 //  THE SOFTWARE.
 //
 
-#import "NSManagedObjectContext+SLRESTfulCoreData.h"
+#import "NSManagedObjectContext+SLCoreDataStack.h"
 
 static id managedObjectIDCollector(id object)
 {
@@ -94,7 +94,7 @@ static id managedObjectCollector(id objectIDs, NSManagedObjectContext *context)
 
 
 
-@implementation NSManagedObjectContext (SLRESTfulCoreData)
+@implementation NSManagedObjectContext (SLCoreDataStack)
 
 - (void)__SLRESTfulCoreDataPerformBlock:(void (^)(id object))block withObjectIDs:(id)objectIDs
 {

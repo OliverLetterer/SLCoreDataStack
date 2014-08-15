@@ -28,7 +28,7 @@
 
 
 
-@interface NSManagedObjectContext (SLRESTfulCoreData)
+@interface NSManagedObjectContext (SLCoreDataStack)
 
 /**
  @param object can be an NSManagedObject, an NSManagedObjectID or one or multiple array(s) of these both.

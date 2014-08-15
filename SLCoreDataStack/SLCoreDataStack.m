@@ -42,14 +42,14 @@ static void class_swizzleSelector(Class class, SEL originalSelector, SEL newSele
 
 NSString *const SLCoreDataStackErrorDomain = @"SLCoreDataStackErrorDomain";
 
-@interface NSManagedObjectContext (SLCoreDataStack)
+@interface NSManagedObjectContext (SLCoreDataStackInternal)
 
 @property (nonatomic, strong) NSMutableArray *SLCoreDataStack_deallocationHandlers;
 - (void)SLCoreDataStack_addDeallocationHandler:(void(^)(__unsafe_unretained NSManagedObjectContext *context))handler;
 
 @end
 
-@implementation NSManagedObjectContext (SLCoreDataStack)
+@implementation NSManagedObjectContext (SLCoreDataStackInternal)
 
 #pragma mark - setters and getters
 
