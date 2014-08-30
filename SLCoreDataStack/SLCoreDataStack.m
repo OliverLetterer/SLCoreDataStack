@@ -391,26 +391,31 @@ NSString *const SLCoreDataStackErrorDomain = @"SLCoreDataStackErrorDomain";
         NSURL *storeURL = self.dataStoreURL;
         NSManagedObjectModel *managedObjectModel = self.managedObjectModel;
 
-        NSDictionary *options = @{
-                                  NSMigratePersistentStoresAutomaticallyOption: @YES,
-                                  NSInferMappingModelAutomaticallyOption: @YES
-                                  };
+        NSDictionary *noMigrationOptions = @{
+                                             NSMigratePersistentStoresAutomaticallyOption: @NO,
+                                             NSInferMappingModelAutomaticallyOption: @NO
+                                             };
+
+        NSDictionary *migrationOptions = @{
+                                           NSMigratePersistentStoresAutomaticallyOption: @YES,
+                                           NSInferMappingModelAutomaticallyOption: @YES
+                                           };
 
         NSError *error = nil;
         _persistentStoreCoordinator = [[NSPersistentStoreCoordinator alloc] initWithManagedObjectModel:managedObjectModel];
-        if (![_persistentStoreCoordinator addPersistentStoreWithType:self.storeType configuration:nil URL:storeURL options:options error:&error]) {
+        if (![_persistentStoreCoordinator addPersistentStoreWithType:self.storeType configuration:nil URL:storeURL options:noMigrationOptions error:&error]) {
             error = nil;
             // first try to migrate to the new store
             if (![self _performMigrationFromDataStoreAtURL:storeURL toDestinationModel:managedObjectModel error:&error]) {
                 // migration was not successful => delete database and continue
                 [[NSFileManager defaultManager] removeItemAtURL:storeURL error:NULL];
 
-                if (![_persistentStoreCoordinator addPersistentStoreWithType:self.storeType configuration:nil URL:storeURL options:nil error:&error]) {
+                if (![_persistentStoreCoordinator addPersistentStoreWithType:self.storeType configuration:nil URL:storeURL options:migrationOptions error:&error]) {
                     NSAssert(NO, @"Could not add persistent store: %@", error);
                 }
             } else {
                 // migration was successful, just add the store
-                if (![_persistentStoreCoordinator addPersistentStoreWithType:self.storeType configuration:nil URL:storeURL options:nil error:&error]) {
+                if (![_persistentStoreCoordinator addPersistentStoreWithType:self.storeType configuration:nil URL:storeURL options:migrationOptions error:&error]) {
                     // unable to add store, fail
                     NSAssert(NO, @"Could not add persistent store: %@", error);
                 }
@@ -682,7 +687,7 @@ NSString *const SLCoreDataStackErrorDomain = @"SLCoreDataStackErrorDomain";
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
     NSManagedObjectContext *context = self.managedObjectContext;
 
-    if (context) {
+    if (context && context.concurrencyType != NSConfinementConcurrencyType) {
         __block dispatch_queue_t queue = NULL;
         [context performBlockAndWait:^{
             queue = dispatch_get_current_queue();
