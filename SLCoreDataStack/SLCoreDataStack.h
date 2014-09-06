@@ -58,15 +58,10 @@ enum {
 
 /**
  Return the name for your CoreData model here.
- 
+
  @warning Must be overwritten.
  */
 @property (nonatomic, readonly) NSString *managedObjectModelName;
-
-/**
- Returns a unique shared instance for the calling class.
- */
-+ (instancetype)sharedInstance;
 
 /**
  The root URL in which the database will be stored. Default is NSLibraryDirectory.
@@ -79,24 +74,24 @@ enum {
 @property (nonatomic, readonly) NSBundle *bundle;
 
 /**
- Returns YES if any concrete subclass requires a migration that has been registered with +[SLCoreDataStack registerSubclass:].
- */
-+ (BOOL)subclassesRequireMigration;
-
-/**
- Registers a concrete subclass
- */
-+ (void)registerConcreteSubclass:(Class)subclass;
-
-/**
- Runs each available migration on its own an a different thread.
- */
-+ (void)migrateSubclassesWithProgressHandler:(void(^)(SLCoreDataStack *currentMigratingSubclass))progressHandler
-                           completionHandler:(dispatch_block_t)completionHandler;
-
-/**
  Return YES if you want to assert cases where you access NSManagedObjects on the wrong thread. Defaults to NO and can only be used if DEBUG is defined.
  */
 + (BOOL)coreDataThreadDebuggingEnabled;
+
+@end
+
+
+
+@interface SLCoreDataStack (Singleton)
+
++ (instancetype)sharedInstance;
+
+@end
+
+
+@interface SLCoreDataStack (Migration)
+
+@property (nonatomic, readonly) BOOL requiresMigration;
+- (BOOL)migrateDataStore:(NSError **)error;
 
 @end
