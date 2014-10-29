@@ -1,6 +1,6 @@
 Pod::Spec.new do |spec|
   spec.name          = 'SLCoreDataStack'
-  spec.version       = '0.8.1'
+  spec.version       = '0.8.2'
   spec.platform      = :ios, '7.0'
   spec.license       = 'MIT'
   spec.source        = { :git => 'https://github.com/OliverLetterer/SLCoreDataStack.git', :tag => spec.version.to_s }
