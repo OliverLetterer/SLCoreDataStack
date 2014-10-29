@@ -206,9 +206,23 @@ NSString *const SLCoreDataStackErrorDomain = @"SLCoreDataStackErrorDomain";
 {
     if (!_managedObjectModel) {
         NSString *managedObjectModelName = self.managedObjectModelName;
-        NSURL *modelURL = [self.bundle URLForResource:managedObjectModelName withExtension:@"momd"];
+        NSURL *momURL = [self.bundle URLForResource:managedObjectModelName withExtension:@"mom"];
+        NSURL *momdURL = [self.bundle URLForResource:managedObjectModelName withExtension:@"momd"];
 
-        _managedObjectModel = [[NSManagedObjectModel alloc] initWithContentsOfURL:modelURL];
+        if (momURL && momdURL) {
+            NSDate *momCreationDate = [[NSFileManager defaultManager] attributesOfItemAtPath:momURL.path error:NULL].fileCreationDate;
+            NSDate *momdCreationDate = [[NSFileManager defaultManager] attributesOfItemAtPath:momdURL.path error:NULL].fileCreationDate;
+
+            if (momCreationDate.timeIntervalSince1970 > momdCreationDate.timeIntervalSince1970) {
+                NSLog(@"Found mom and momd model, will be using mom because fileCreationDate is newer");
+                momdURL = nil;
+            } else {
+                NSLog(@"Found mom and momd model, will be using momd because fileCreationDate is newer");
+                momURL = nil;
+            }
+        }
+
+        _managedObjectModel = [[NSManagedObjectModel alloc] initWithContentsOfURL:momURL ?: momdURL];
     }
 
     return _managedObjectModel;
