@@ -25,7 +25,7 @@
 
 #import <CoreData/CoreData.h>
 #import <Foundation/Foundation.h>
-#import <NSManagedObjectContext+SLCoreDataStack.h>
+#import <SLCoreDataStack/NSManagedObjectContext+SLCoreDataStack.h>
 
 extern NSString *const SLCoreDataStackErrorDomain;
 
