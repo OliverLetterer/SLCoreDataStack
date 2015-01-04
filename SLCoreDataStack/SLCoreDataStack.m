@@ -26,6 +26,7 @@
 #import "SLCoreDataStack.h"
 #import <objc/runtime.h>
 #import <objc/message.h>
+#import <libkern/OSAtomic.h>
 
 static void class_swizzleSelector(Class class, SEL originalSelector, SEL newSelector)
 {
@@ -501,7 +502,13 @@ NSString *const SLCoreDataStackErrorDomain = @"SLCoreDataStackErrorDomain";
 
 - (BOOL)migrateDataStore:(NSError **)error
 {
-    return [self _performMigrationFromDataStoreAtURL:self.dataStoreURL toDestinationModel:self.managedObjectModel error:error];
+    static OSSpinLock lock = OS_SPINLOCK_INIT;
+
+    OSSpinLockLock(&lock);
+    BOOL success = [self _performMigrationFromDataStoreAtURL:self.dataStoreURL toDestinationModel:self.managedObjectModel error:error];
+    OSSpinLockUnlock(&lock);
+
+    return success;
 }
 
 - (BOOL)_performMigrationFromDataStoreAtURL:(NSURL *)dataStoreURL
@@ -643,18 +650,18 @@ NSString *const SLCoreDataStackErrorDomain = @"SLCoreDataStackErrorDomain";
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
     NSManagedObjectContext *context = self.managedObjectContext;
-
+    
     if (context) {
         __block dispatch_queue_t queue = NULL;
         [context performBlockAndWait:^{
             queue = dispatch_get_current_queue();
         }];
-
+        
         NSAssert(queue == dispatch_get_current_queue(), @"wrong queue buddy");
     }
-
+    
 #pragma clang diagnostic pop
-
+    
     [self __SLCoreDataStackCoreDataThreadDebuggingWillChangeValueForKey:key];
 }
 
