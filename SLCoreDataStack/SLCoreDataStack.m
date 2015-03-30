@@ -176,6 +176,7 @@ NSString *const SLCoreDataStackErrorDomain = @"SLCoreDataStackErrorDomain";
     if (self = [super init]) {
         _observingManagedObjectContexts = [NSPointerArray pointerArrayWithOptions:NSPointerFunctionsWeakMemory];
 
+#if TARGET_OS_IPHONE
         [[NSNotificationCenter defaultCenter] addObserver:self
                                                  selector:@selector(_automaticallySaveDataStore)
                                                      name:UIApplicationWillTerminateNotification
@@ -185,14 +186,17 @@ NSString *const SLCoreDataStackErrorDomain = @"SLCoreDataStackErrorDomain";
                                                  selector:@selector(_automaticallySaveDataStore)
                                                      name:UIApplicationDidEnterBackgroundNotification
                                                    object:nil];
+#endif
     }
     return self;
 }
 
+#if TARGET_OS_IPHONE
 - (void)dealloc
 {
     [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
+#endif
 
 #pragma mark - Class methods
 
