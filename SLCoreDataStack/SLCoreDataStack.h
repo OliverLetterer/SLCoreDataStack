@@ -1,8 +1,6 @@
 //
-//  SLCoreDataStack.h
-//
 //  The MIT License (MIT)
-//  Copyright (c) 2013 Oliver Letterer, Sparrow-Labs
+//  Copyright (c) 2013-2015 Oliver Letterer, Sparrow-Labs
 //
 //  Permission is hereby granted, free of charge, to any person obtaining a copy
 //  of this software and associated documentation files (the "Software"), to deal
@@ -38,45 +36,22 @@ enum {
 
 @interface SLCoreDataStack : NSObject
 
-@property (nonatomic, strong) NSManagedObjectModel *managedObjectModel;
-@property (nonatomic, strong) NSPersistentStoreCoordinator *persistentStoreCoordinator;
-@property (nonatomic, readonly) NSString *storeType;
-
-@property (nonatomic, strong) NSManagedObjectContext *mainThreadManagedObjectContext;
-@property (nonatomic, strong) NSManagedObjectContext *backgroundThreadManagedObjectContext;
-
-/**
- returns a new NSManagedObjectContext instance which is observed by this CoreData stack and automatically merges changes between all other observing contexts. Observation ends iff the NSManagedObjectContext gets dealloced.
- */
-- (NSManagedObjectContext *)newManagedObjectContextWithConcurrencyType:(NSManagedObjectContextConcurrencyType)concurrencyType;
-
-/**
- Merge policies which will be applied to mainThreadManagedObjectContext and backgroundThreadManagedObjectContext.
- */
-@property (nonatomic, readonly) id mainThreadMergePolicy;
-@property (nonatomic, readonly) id backgroundThreadMergePolicy;
-
-/**
- Return the name for your CoreData model here.
-
- @warning Must be overwritten.
- */
-@property (nonatomic, readonly) NSString *managedObjectModelName;
-
-/**
- The root URL in which the database will be stored. Default is NSLibraryDirectory.
- */
-@property (nonatomic, readonly) NSURL *databaseRootURL;
-
-/**
- The bundle, in with the momd file and migrations are stored.
- */
 @property (nonatomic, readonly) NSBundle *bundle;
 
-/**
- Return YES if you want to assert cases where you access NSManagedObjects on the wrong thread. Defaults to NO and can only be used if DEBUG is defined.
- */
-+ (BOOL)coreDataThreadDebuggingEnabled;
+@property (nonatomic, readonly) NSString *storeType;
+@property (nonatomic, readonly) NSURL *storeLocation;
+
+@property (nonatomic, readonly) NSURL *managedObjectModelURL;
+@property (nonatomic, readonly) NSManagedObjectModel *managedObjectModel;
+@property (nonatomic, readonly) NSPersistentStoreCoordinator *persistentStoreCoordinator;
+
+@property (nonatomic, readonly) NSManagedObjectContext *mainThreadManagedObjectContext;
+@property (nonatomic, readonly) NSManagedObjectContext *backgroundThreadManagedObjectContext;
+
+- (instancetype)init NS_UNAVAILABLE;
+- (instancetype)initWithType:(NSString *)storeType location:(NSURL *)storeLocation model:(NSURL *)modelURL inBundle:(NSBundle *)bundle NS_DESIGNATED_INITIALIZER;
+
++ (instancetype)newConvenientSQLiteStackWithModel:(NSString *)model inBundle:(NSBundle *)bundle;
 
 @end
 
@@ -84,7 +59,7 @@ enum {
 
 @interface SLCoreDataStack (Singleton)
 
-+ (instancetype)sharedInstance;
++ (instancetype)sharedInstance NS_UNAVAILABLE;
 
 @end
 

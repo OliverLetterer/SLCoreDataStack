@@ -1,8 +1,6 @@
 //
-//  SLCoreDataStack.m
-//
 //  The MIT License (MIT)
-//  Copyright (c) 2013 Oliver Letterer, Sparrow-Labs
+//  Copyright (c) 2013-2015 Oliver Letterer, Sparrow-Labs
 //
 //  Permission is hereby granted, free of charge, to any person obtaining a copy
 //  of this software and associated documentation files (the "Software"), to deal
@@ -106,14 +104,11 @@ NSString *const SLCoreDataStackErrorDomain = @"SLCoreDataStackErrorDomain";
 
 @property (nonatomic, strong) NSPointerArray *observingManagedObjectContexts;
 
-@property (nonatomic, readonly) NSURL *_dataStoreRootURL;
-@property (nonatomic, readonly) NSURL *dataStoreURL;
-
 @end
 
 
 @implementation SLCoreDataStack
-@synthesize mainThreadManagedObjectContext = _mainThreadManagedObjectContext, backgroundThreadManagedObjectContext = _backgroundThreadManagedObjectContext;
+@synthesize mainThreadManagedObjectContext = _mainThreadManagedObjectContext, backgroundThreadManagedObjectContext = _backgroundThreadManagedObjectContext, managedObjectModel = _managedObjectModel, persistentStoreCoordinator = _persistentStoreCoordinator;
 
 #pragma mark - setters and getters
 
@@ -127,54 +122,54 @@ NSString *const SLCoreDataStackErrorDomain = @"SLCoreDataStackErrorDomain";
     return NSMergeByPropertyObjectTrumpMergePolicy;
 }
 
-- (NSString *)managedObjectModelName
-{
-    [self doesNotRecognizeSelector:_cmd];
-    return nil;
-}
-
-- (NSURL *)databaseRootURL
-{
-    return [[NSFileManager defaultManager] URLsForDirectory:NSLibraryDirectory
-                                                  inDomains:NSUserDomainMask].lastObject;
-}
-
-- (NSURL *)dataStoreURL
-{
-    NSURL *dataStoreRootURL = self._dataStoreRootURL;
-    NSString *dataStoreFileName = [NSString stringWithFormat:@"%@.sqlite", self.managedObjectModelName];
-
-    return [dataStoreRootURL URLByAppendingPathComponent:dataStoreFileName];
-}
-
-- (NSURL *)_dataStoreRootURL
-{
-    NSURL *dataStoreRootURL = self.databaseRootURL;
-
-    if (![[NSFileManager defaultManager] fileExistsAtPath:dataStoreRootURL.relativePath isDirectory:NULL]) {
-        NSError *error = nil;
-        [[NSFileManager defaultManager] createDirectoryAtPath:dataStoreRootURL.relativePath
-                                  withIntermediateDirectories:YES
-                                                   attributes:nil
-                                                        error:&error];
-
-        NSAssert(error == nil, @"error while creating dataStoreRootURL '%@':\n\nerror: \"%@\"", dataStoreRootURL, error);
-    }
-
-    return dataStoreRootURL;
-}
-
-- (NSBundle *)bundle
-{
-    return [NSBundle bundleForClass:self.class];
-}
-
 #pragma mark - Initialization
 
-- (instancetype)init
++ (instancetype)newConvenientSQLiteStackWithModel:(NSString *)model inBundle:(NSBundle *)bundle
+{
+    NSURL *momURL = [bundle URLForResource:model withExtension:@"mom"];
+    NSURL *momdURL = [bundle URLForResource:model withExtension:@"momd"];
+
+    if (momURL && momdURL) {
+        NSDate *momCreationDate = [[NSFileManager defaultManager] attributesOfItemAtPath:momURL.path error:NULL].fileCreationDate;
+        NSDate *momdCreationDate = [[NSFileManager defaultManager] attributesOfItemAtPath:momdURL.path error:NULL].fileCreationDate;
+
+        if (momCreationDate.timeIntervalSince1970 > momdCreationDate.timeIntervalSince1970) {
+            NSLog(@"Found mom and momd model, will be using mom because fileCreationDate is newer");
+            momdURL = nil;
+        } else {
+            NSLog(@"Found mom and momd model, will be using momd because fileCreationDate is newer");
+            momURL = nil;
+        }
+    }
+
+    NSAssert(momURL != nil || momdURL != nil, @"Neither %@.mom nor %@.momd could be found in bundle %@", model, model, bundle);
+    NSURL *libraryDirectory = [[NSFileManager defaultManager] URLsForDirectory:NSLibraryDirectory
+                                                                     inDomains:NSUserDomainMask].lastObject;
+
+    NSURL *location = [libraryDirectory URLByAppendingPathComponent:[NSString stringWithFormat:@"%@.sqlite", model]];
+    return [[self alloc] initWithType:NSSQLiteStoreType location:location model:momURL ?: momdURL inBundle:bundle];
+}
+
+- (instancetype)initWithType:(NSString *)storeType location:(NSURL *)storeLocation model:(NSURL *)modelURL inBundle:(NSBundle *)bundle
 {
     if (self = [super init]) {
+        _storeLocation = storeLocation;
+        _storeType = storeType;
+        _managedObjectModelURL = modelURL;
+        _bundle = bundle;
+
         _observingManagedObjectContexts = [NSPointerArray pointerArrayWithOptions:NSPointerFunctionsWeakMemory];
+
+        NSString *parentDirectory = storeLocation.URLByDeletingLastPathComponent.path;
+        if (![[NSFileManager defaultManager] fileExistsAtPath:parentDirectory isDirectory:NULL]) {
+            NSError *error = nil;
+            [[NSFileManager defaultManager] createDirectoryAtPath:parentDirectory
+                                      withIntermediateDirectories:YES
+                                                       attributes:nil
+                                                            error:&error];
+
+            NSAssert(error == nil, @"error while creating parentDirectory '%@':\n\nerror: \"%@\"", parentDirectory, error);
+        }
 
 #if TARGET_OS_IPHONE
         [[NSNotificationCenter defaultCenter] addObserver:self
@@ -191,18 +186,9 @@ NSString *const SLCoreDataStackErrorDomain = @"SLCoreDataStackErrorDomain";
     return self;
 }
 
-#if TARGET_OS_IPHONE
 - (void)dealloc
 {
     [[NSNotificationCenter defaultCenter] removeObserver:self];
-}
-#endif
-
-#pragma mark - Class methods
-
-+ (BOOL)coreDataThreadDebuggingEnabled
-{
-    return NO;
 }
 
 #pragma mark - CoreData
@@ -210,24 +196,8 @@ NSString *const SLCoreDataStackErrorDomain = @"SLCoreDataStackErrorDomain";
 - (NSManagedObjectModel *)managedObjectModel
 {
     if (!_managedObjectModel) {
-        NSString *managedObjectModelName = self.managedObjectModelName;
-        NSURL *momURL = [self.bundle URLForResource:managedObjectModelName withExtension:@"mom"];
-        NSURL *momdURL = [self.bundle URLForResource:managedObjectModelName withExtension:@"momd"];
-
-        if (momURL && momdURL) {
-            NSDate *momCreationDate = [[NSFileManager defaultManager] attributesOfItemAtPath:momURL.path error:NULL].fileCreationDate;
-            NSDate *momdCreationDate = [[NSFileManager defaultManager] attributesOfItemAtPath:momdURL.path error:NULL].fileCreationDate;
-
-            if (momCreationDate.timeIntervalSince1970 > momdCreationDate.timeIntervalSince1970) {
-                NSLog(@"Found mom and momd model, will be using mom because fileCreationDate is newer");
-                momdURL = nil;
-            } else {
-                NSLog(@"Found mom and momd model, will be using momd because fileCreationDate is newer");
-                momURL = nil;
-            }
-        }
-
-        _managedObjectModel = [[NSManagedObjectModel alloc] initWithContentsOfURL:momURL ?: momdURL];
+        _managedObjectModel = [[NSManagedObjectModel alloc] initWithContentsOfURL:self.managedObjectModelURL];
+        NSParameterAssert(_managedObjectModel);
     }
 
     return _managedObjectModel;
@@ -238,7 +208,7 @@ NSString *const SLCoreDataStackErrorDomain = @"SLCoreDataStackErrorDomain";
     if (!_mainThreadManagedObjectContext) {
         _mainThreadManagedObjectContext = [[NSManagedObjectContext alloc] initWithConcurrencyType:NSMainQueueConcurrencyType];
         _mainThreadManagedObjectContext.persistentStoreCoordinator = self.persistentStoreCoordinator;
-        _mainThreadManagedObjectContext.mergePolicy = self.mainThreadMergePolicy;
+        _mainThreadManagedObjectContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy;
 
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(_managedObjectContextDidSaveNotificationCallback:) name:NSManagedObjectContextDidSaveNotification object:_mainThreadManagedObjectContext];
     }
@@ -246,23 +216,12 @@ NSString *const SLCoreDataStackErrorDomain = @"SLCoreDataStackErrorDomain";
     return _mainThreadManagedObjectContext;
 }
 
-- (void)setMainThreadManagedObjectContext:(NSManagedObjectContext *)mainThreadManagedObjectContext
-{
-    if (mainThreadManagedObjectContext != _mainThreadManagedObjectContext) {
-        [[NSNotificationCenter defaultCenter] removeObserver:self name:NSManagedObjectContextDidSaveNotification object:_mainThreadManagedObjectContext];
-
-        _mainThreadManagedObjectContext = mainThreadManagedObjectContext;
-
-        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(_managedObjectContextDidSaveNotificationCallback:) name:NSManagedObjectContextDidSaveNotification object:_mainThreadManagedObjectContext];
-    }
-}
-
 - (NSManagedObjectContext *)backgroundThreadManagedObjectContext
 {
     if (!_backgroundThreadManagedObjectContext) {
         _backgroundThreadManagedObjectContext = [[NSManagedObjectContext alloc] initWithConcurrencyType:NSPrivateQueueConcurrencyType];
         _backgroundThreadManagedObjectContext.persistentStoreCoordinator = self.persistentStoreCoordinator;
-        _backgroundThreadManagedObjectContext.mergePolicy = self.backgroundThreadMergePolicy;
+        _backgroundThreadManagedObjectContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy;
 
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(_managedObjectContextDidSaveNotificationCallback:) name:NSManagedObjectContextDidSaveNotification object:_backgroundThreadManagedObjectContext];
     }
@@ -270,21 +229,10 @@ NSString *const SLCoreDataStackErrorDomain = @"SLCoreDataStackErrorDomain";
     return _backgroundThreadManagedObjectContext;
 }
 
-- (void)setBackgroundThreadManagedObjectContext:(NSManagedObjectContext *)backgroundThreadManagedObjectContext
-{
-    if (backgroundThreadManagedObjectContext != _backgroundThreadManagedObjectContext) {
-        [[NSNotificationCenter defaultCenter] removeObserver:self name:NSManagedObjectContextDidSaveNotification object:_backgroundThreadManagedObjectContext];
-
-        _backgroundThreadManagedObjectContext = backgroundThreadManagedObjectContext;
-
-        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(_managedObjectContextDidSaveNotificationCallback:) name:NSManagedObjectContextDidSaveNotification object:_backgroundThreadManagedObjectContext];
-    }
-}
-
 - (NSPersistentStoreCoordinator *)persistentStoreCoordinator
 {
     if (!_persistentStoreCoordinator) {
-        NSURL *storeURL = self.dataStoreURL;
+        NSURL *storeURL = self.storeLocation;
         NSManagedObjectModel *managedObjectModel = self.managedObjectModel;
 
         if (self.requiresMigration) {
@@ -317,17 +265,10 @@ NSString *const SLCoreDataStackErrorDomain = @"SLCoreDataStackErrorDomain";
     }
 
 #ifdef DEBUG
-    if ([self.class coreDataThreadDebuggingEnabled]) {
-        [self _enableCoreDataThreadDebugging];
-    }
+    [self _enableCoreDataThreadDebugging];
 #endif
 
     return _persistentStoreCoordinator;
-}
-
-- (NSString *)storeType
-{
-    return NSSQLiteStoreType;
 }
 
 - (NSManagedObjectContext *)newManagedObjectContextWithConcurrencyType:(NSManagedObjectContextConcurrencyType)concurrencyType
@@ -468,23 +409,7 @@ NSString *const SLCoreDataStackErrorDomain = @"SLCoreDataStackErrorDomain";
 
 + (instancetype)sharedInstance
 {
-    @synchronized(self) {
-        static NSMutableDictionary *_sharedDataStoreManagers = nil;
-        static dispatch_once_t onceToken;
-        dispatch_once(&onceToken, ^{
-            _sharedDataStoreManagers = [NSMutableDictionary dictionary];
-        });
-
-        NSString *uniqueKey = NSStringFromClass(self.class);
-        SLCoreDataStack *instance = _sharedDataStoreManagers[uniqueKey];
-
-        if (!instance) {
-            instance = [[super allocWithZone:NULL] init];
-            _sharedDataStoreManagers[uniqueKey] = instance;
-        }
-
-        return instance;
-    }
+    return nil;
 }
 
 @end
@@ -495,7 +420,7 @@ NSString *const SLCoreDataStackErrorDomain = @"SLCoreDataStackErrorDomain";
 
 - (BOOL)requiresMigration
 {
-    NSDictionary *sourceStoreMetadata = [NSPersistentStoreCoordinator metadataForPersistentStoreOfType:self.storeType URL:self.dataStoreURL error:NULL];
+    NSDictionary *sourceStoreMetadata = [NSPersistentStoreCoordinator metadataForPersistentStoreOfType:self.storeType URL:self.storeLocation error:NULL];
 
     if (!sourceStoreMetadata) {
         return NO;
@@ -509,7 +434,7 @@ NSString *const SLCoreDataStackErrorDomain = @"SLCoreDataStackErrorDomain";
     static OSSpinLock lock = OS_SPINLOCK_INIT;
 
     OSSpinLockLock(&lock);
-    BOOL success = [self _performMigrationFromDataStoreAtURL:self.dataStoreURL toDestinationModel:self.managedObjectModel error:error];
+    BOOL success = [self _performMigrationFromDataStoreAtURL:self.storeLocation toDestinationModel:self.managedObjectModel error:error];
     OSSpinLockUnlock(&lock);
 
     return success;
