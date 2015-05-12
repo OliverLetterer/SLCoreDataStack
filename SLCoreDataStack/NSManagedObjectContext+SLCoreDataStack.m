@@ -31,20 +31,20 @@ static id managedObjectIDCollector(id object)
     if ([object isKindOfClass:[NSArray class]]) {
         NSArray *array = object;
         NSMutableArray *newArray = [NSMutableArray arrayWithCapacity:array.count];
-        
+
         for (id managedObject in array) {
             [newArray addObject:managedObjectIDCollector(managedObject)];
         }
-        
+
         return newArray;
     } else if ([object isKindOfClass:[NSDictionary class]]) {
         NSDictionary *dictionary = object;
         NSMutableDictionary *newDictionary = [NSMutableDictionary dictionaryWithCapacity:dictionary.count];
-        
+
         for (id key in dictionary) {
             newDictionary[key] = managedObjectIDCollector(dictionary[key]);
         }
-        
+
         return newDictionary;
     } else if ([object isKindOfClass:[NSManagedObject class]]) {
         return [object objectID];
@@ -53,41 +53,61 @@ static id managedObjectIDCollector(id object)
     } else if (!object) {
         return nil;
     }
-    
+
     NSCAssert(NO, @"%@ is unsupported by performBlock:withObject:", object);
     return nil;
 }
 
-static id managedObjectCollector(id objectIDs, NSManagedObjectContext *context)
+static id managedObjectCollector(id objectIDs, NSManagedObjectContext *context, NSError **error)
 {
     if ([objectIDs isKindOfClass:[NSArray class]]) {
         NSArray *array = objectIDs;
         NSMutableArray *newArray = [NSMutableArray arrayWithCapacity:array.count];
-        
+
         for (id object in array) {
-            [newArray addObject:managedObjectCollector(object, context)];
+            NSError *localError = nil;
+            id result = managedObjectCollector(object, context, &localError);
+
+            if (localError) {
+                *error = localError;
+                return nil;
+            }
+
+            [newArray addObject:result];
         }
-        
+
         return newArray;
     } else if ([objectIDs isKindOfClass:[NSDictionary class]]) {
         NSDictionary *dictionary = objectIDs;
         NSMutableDictionary *newDictionary = [NSMutableDictionary dictionaryWithCapacity:dictionary.count];
-        
+
         for (id key in dictionary) {
-            newDictionary[key] = managedObjectCollector(dictionary[key], context);
+            NSError *localError = nil;
+            id result = managedObjectCollector(dictionary[key], context, &localError);
+
+            if (localError) {
+                *error = localError;
+                return nil;
+            }
+
+            newDictionary[key] = result;
         }
-        
+
         return newDictionary;
     } else if ([objectIDs isKindOfClass:[NSManagedObjectID class]]) {
-        NSError *error = nil;
-        NSManagedObject *managedObject = [context existingObjectWithID:objectIDs error:&error];
-        NSCAssert(error == nil, @"error in managedObjectCollector: %@. Make sure to only use performBlock:withObjects: with _saved_ managed objects.", error);
+        NSError *localError = nil;
+        NSManagedObject *managedObject = [context existingObjectWithID:objectIDs error:&localError];
+
+        if (localError) {
+            *error = localError;
+            return nil;
+        }
 
         return managedObject;
     } else if (!objectIDs) {
         return nil;
     }
-    
+
     NSCAssert(NO, @"%@ is unsupported by performBlock:withObject:", objectIDs);
     return nil;
 }
@@ -96,18 +116,25 @@ static id managedObjectCollector(id objectIDs, NSManagedObjectContext *context)
 
 @implementation NSManagedObjectContext (SLCoreDataStack)
 
-- (void)__SLRESTfulCoreDataPerformBlock:(void (^)(id object))block withObjectIDs:(id)objectIDs
+- (void)performBlock:(void (^)(id object, NSError *error))block withObject:(id)object
 {
-    NSParameterAssert(block);
-    
+    id objectIDs = managedObjectIDCollector(object);
+
     [self performBlock:^{
-        block(managedObjectCollector(objectIDs, self));
+        NSError *error = nil;
+        block(managedObjectCollector(objectIDs, self, &error), error);
     }];
 }
 
-- (void)performBlock:(void (^)(id object))block withObject:(id)object
+- (void)performUnsafeBlock:(void (^)(id object))block withObject:(id)object
 {
-    [self __SLRESTfulCoreDataPerformBlock:block withObjectIDs:managedObjectIDCollector(object)];
+    [self performBlock:^(id object, NSError *error) {
+        if (error != nil) {
+            [NSException raise:NSInternalInconsistencyException format:@"performUnsafeBlock raised an error: %@", error];
+        }
+
+        block(object);
+    } withObject:object];
 }
 
 @end

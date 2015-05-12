@@ -28,13 +28,22 @@
 
 
 
+NS_ASSUME_NONNULL_BEGIN
+
 @interface NSManagedObjectContext (SLCoreDataStack)
 
 /**
  @param object can be an NSManagedObject, an NSManagedObjectID or one or multiple array(s) of these both.
- 
+
  @example [context performBlock:... withObject:@[ object1, objectID2, @[ someOtherObject ] ]];
  */
-- (void)performBlock:(void (^)(id object))block withObject:(id)object;
+- (void)performBlock:(void (^)(id __nullable object, NSError *__nullable error))block withObject:(id)object;
+
+/**
+ Performs a block with `performBlock:withObject:` but raises an exception in the error case.
+ */
+- (void)performUnsafeBlock:(void (^)(id object))block withObject:(id)object;
 
 @end
+
+NS_ASSUME_NONNULL_END
