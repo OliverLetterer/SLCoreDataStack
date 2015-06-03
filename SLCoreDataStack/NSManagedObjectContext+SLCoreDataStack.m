@@ -128,9 +128,11 @@ static id managedObjectCollector(id objectIDs, NSManagedObjectContext *context, 
 
 - (void)performUnsafeBlock:(void (^)(id object))block withObject:(id)object
 {
+    NSArray *callStackSymbols = [NSThread callStackSymbols];
+
     [self performBlock:^(id object, NSError *error) {
         if (error != nil) {
-            [NSException raise:NSInternalInconsistencyException format:@"performUnsafeBlock raised an error: %@", error];
+            [NSException raise:NSInternalInconsistencyException format:@"performUnsafeBlock raised an error: %@, call stack: %@", error, callStackSymbols];
         }
 
         block(object);
