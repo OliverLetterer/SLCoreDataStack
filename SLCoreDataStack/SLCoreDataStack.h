@@ -48,7 +48,7 @@ enum {
 @property (nonatomic, readonly) NSManagedObjectContext *mainThreadManagedObjectContext;
 @property (nonatomic, readonly) NSManagedObjectContext *backgroundThreadManagedObjectContext;
 
-- (instancetype)init NS_UNAVAILABLE;
+- (instancetype)init NS_DESIGNATED_INITIALIZER NS_UNAVAILABLE;
 - (instancetype)initWithType:(NSString *)storeType location:(NSURL *)storeLocation model:(NSURL *)modelURL inBundle:(NSBundle *)bundle NS_DESIGNATED_INITIALIZER;
 
 + (instancetype)newConvenientSQLiteStackWithModel:(NSString *)model inBundle:(NSBundle *)bundle;

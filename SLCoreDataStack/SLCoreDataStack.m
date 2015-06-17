@@ -150,6 +150,11 @@ NSString *const SLCoreDataStackErrorDomain = @"SLCoreDataStackErrorDomain";
     return [[self alloc] initWithType:NSSQLiteStoreType location:location model:momURL ?: momdURL inBundle:bundle];
 }
 
+- (instancetype)init
+{
+    return [super init];
+}
+
 - (instancetype)initWithType:(NSString *)storeType location:(NSURL *)storeLocation model:(NSURL *)modelURL inBundle:(NSBundle *)bundle
 {
     if (self = [super init]) {
@@ -579,18 +584,18 @@ NSString *const SLCoreDataStackErrorDomain = @"SLCoreDataStackErrorDomain";
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
     NSManagedObjectContext *context = self.managedObjectContext;
-    
+
     if (context) {
         __block dispatch_queue_t queue = NULL;
         [context performBlockAndWait:^{
             queue = dispatch_get_current_queue();
         }];
-        
+
         NSAssert(queue == dispatch_get_current_queue(), @"wrong queue buddy");
     }
-    
+
 #pragma clang diagnostic pop
-    
+
     [self __SLCoreDataStackCoreDataThreadDebuggingWillChangeValueForKey:key];
 }
 
