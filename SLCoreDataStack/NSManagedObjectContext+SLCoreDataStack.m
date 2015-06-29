@@ -3,7 +3,7 @@
 //  SLRESTfulCoreData
 //
 //  The MIT License (MIT)
-//  Copyright (c) 2013 Oliver Letterer, Sparrow-Labs
+//  Copyright (c) 2013-2015 Oliver Letterer, Sparrow-Labs
 //
 //  Permission is hereby granted, free of charge, to any person obtaining a copy
 //  of this software and associated documentation files (the "Software"), to deal
@@ -122,7 +122,10 @@ static id managedObjectCollector(id objectIDs, NSManagedObjectContext *context, 
 
     [self performBlock:^{
         NSError *error = nil;
-        block(managedObjectCollector(objectIDs, self, &error), error);
+
+        if (block) {
+            block(managedObjectCollector(objectIDs, self, &error), error);
+        }
     }];
 }
 
@@ -135,7 +138,9 @@ static id managedObjectCollector(id objectIDs, NSManagedObjectContext *context, 
             [NSException raise:NSInternalInconsistencyException format:@"performUnsafeBlock raised an error: %@, call stack: %@", error, callStackSymbols];
         }
 
-        block(object);
+        if (block) {
+            block(object);
+        }
     } withObject:object];
 }
 

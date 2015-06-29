@@ -3,7 +3,7 @@
 //  SLRESTfulCoreData
 //
 //  The MIT License (MIT)
-//  Copyright (c) 2013 Oliver Letterer, Sparrow-Labs
+//  Copyright (c) 2013-2015 Oliver Letterer, Sparrow-Labs
 //
 //  Permission is hereby granted, free of charge, to any person obtaining a copy
 //  of this software and associated documentation files (the "Software"), to deal
@@ -37,12 +37,12 @@ NS_ASSUME_NONNULL_BEGIN
 
  @example [context performBlock:... withObject:@[ object1, objectID2, @[ someOtherObject ] ]];
  */
-- (void)performBlock:(void (^)(id __nullable object, NSError *__nullable error))block withObject:(id)object;
+- (void)performBlock:(void (^__nullable)(id __nullable object, NSError *__nullable error))block withObject:(id)object;
 
 /**
  Performs a block with `performBlock:withObject:` but raises an exception in the error case.
  */
-- (void)performUnsafeBlock:(void (^)(id object))block withObject:(id)object;
+- (void)performUnsafeBlock:(void (^__nullable)(id object))block withObject:(id)object;
 
 @end
 
