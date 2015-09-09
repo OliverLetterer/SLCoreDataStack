@@ -425,7 +425,16 @@ NSString *const SLCoreDataStackErrorDomain = @"SLCoreDataStackErrorDomain";
 
 - (BOOL)requiresMigration
 {
+#if __IPHONE_OS_VERSION_MIN_REQUIRED >= 90000
+    NSDictionary *options = @{
+                              NSMigratePersistentStoresAutomaticallyOption: @YES,
+                              NSInferMappingModelAutomaticallyOption: @YES
+                              };
+
+    NSDictionary *sourceStoreMetadata = [NSPersistentStoreCoordinator metadataForPersistentStoreOfType:self.storeType URL:self.storeLocation options:options error:NULL];
+#else
     NSDictionary *sourceStoreMetadata = [NSPersistentStoreCoordinator metadataForPersistentStoreOfType:self.storeType URL:self.storeLocation error:NULL];
+#endif
 
     if (!sourceStoreMetadata) {
         return NO;
