@@ -469,9 +469,16 @@ NSString *const SLCoreDataStackErrorDomain = @"SLCoreDataStackErrorDomain";
         return NO;
     };
 
-    NSDictionary *sourceStoreMetadata = [NSPersistentStoreCoordinator metadataForPersistentStoreOfType:self.storeType
-                                                                                                   URL:dataStoreURL
-                                                                                                 error:error];
+#if __IPHONE_OS_VERSION_MIN_REQUIRED >= 90000
+    NSDictionary *options = @{
+                              NSMigratePersistentStoresAutomaticallyOption: @YES,
+                              NSInferMappingModelAutomaticallyOption: @YES
+                              };
+
+    NSDictionary *sourceStoreMetadata = [NSPersistentStoreCoordinator metadataForPersistentStoreOfType:self.storeType URL:dataStoreURL options:options error:error];
+#else
+    NSDictionary *sourceStoreMetadata = [NSPersistentStoreCoordinator metadataForPersistentStoreOfType:self.storeType URL:dataStoreURL error:error];
+#endif
 
     if (!sourceStoreMetadata) {
         return NO;
