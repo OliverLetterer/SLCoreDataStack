@@ -176,15 +176,17 @@ NSString *const SLCoreDataStackErrorDomain = @"SLCoreDataStackErrorDomain";
             NSAssert(error == nil, @"error while creating parentDirectory '%@':\n\nerror: \"%@\"", parentDirectory, error);
         }
 
-#if TARGET_OS_IPHONE
-        [[NSNotificationCenter defaultCenter] addObserver:self
-                                                 selector:@selector(_automaticallySaveDataStore)
-                                                     name:UIApplicationWillTerminateNotification
+#if TARGET_OS_IOS
+        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(_automaticallySaveDataStore)
+                                                   name:UIApplicationWillTerminateNotification
                                                    object:nil];
 
-        [[NSNotificationCenter defaultCenter] addObserver:self
-                                                 selector:@selector(_automaticallySaveDataStore)
+        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(_automaticallySaveDataStore)
                                                      name:UIApplicationDidEnterBackgroundNotification
+                                                   object:nil];
+#elif TARGET_OS_WATCH
+        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(_automaticallySaveDataStore)
+                                                   name:NSExtensionHostDidEnterBackgroundNotification
                                                    object:nil];
 #endif
     }
