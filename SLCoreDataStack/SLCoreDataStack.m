@@ -450,6 +450,24 @@ NSString *const SLCoreDataStackErrorDomain = @"SLCoreDataStackErrorDomain";
     static OSSpinLock lock = OS_SPINLOCK_INIT;
 
     OSSpinLockLock(&lock);
+
+    NSDictionary *options = @{
+                              NSMigratePersistentStoresAutomaticallyOption: @YES,
+                              NSInferMappingModelAutomaticallyOption: @YES
+                              };
+
+    NSError *addStoreError = nil;
+    NSPersistentStoreCoordinator *persistentStoreCoordinator = [[NSPersistentStoreCoordinator alloc] initWithManagedObjectModel:self.managedObjectModel];
+
+    if ([persistentStoreCoordinator addPersistentStoreWithType:self.storeType configuration:nil URL:self.storeLocation options:options error:&addStoreError]) {
+        NSLog(@"[SLCoreDataStack] automatic persistent store migration completed %@", options);
+        OSSpinLockUnlock(&lock);
+        return YES;
+    } else {
+        NSLog(@"[SLCoreDataStack] could not automatic migrate persistent store with %@", options);
+        NSLog(@"[SLCoreDataStack] addStoreError = %@", addStoreError);
+    }
+
     BOOL success = [self _performMigrationFromDataStoreAtURL:self.storeLocation toDestinationModel:self.managedObjectModel error:error];
     OSSpinLockUnlock(&lock);
 
