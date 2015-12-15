@@ -46,6 +46,15 @@ static id managedObjectIDCollector(id object)
         }
 
         return newDictionary;
+    } else if ([object isKindOfClass:[NSSet class]]) {
+        NSSet *set = object;
+        NSMutableSet *newSet = [NSMutableSet set];
+
+        for (id managedObject in set) {
+            [newSet addObject:managedObjectIDCollector(managedObject)];
+        }
+
+        return newSet;
     } else if ([object isKindOfClass:[NSManagedObject class]]) {
         return [object objectID];
     } else if ([object isKindOfClass:[NSManagedObjectID class]]) {
@@ -94,6 +103,23 @@ static id managedObjectCollector(id objectIDs, NSManagedObjectContext *context, 
         }
 
         return newDictionary;
+    } else if ([objectIDs isKindOfClass:[NSSet class]]) {
+        NSSet *set = objectIDs;
+        NSMutableSet *newSet = [NSMutableSet setWithCapacity:set.count];
+
+        for (id object in set) {
+            NSError *localError = nil;
+            id result = managedObjectCollector(object, context, &localError);
+
+            if (localError) {
+                *error = localError;
+                return nil;
+            }
+
+            [newSet addObject:result];
+        }
+
+        return newSet;
     } else if ([objectIDs isKindOfClass:[NSManagedObjectID class]]) {
         NSError *localError = nil;
         NSManagedObject *managedObject = [context existingObjectWithID:objectIDs error:&localError];
