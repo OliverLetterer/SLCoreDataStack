@@ -48,6 +48,11 @@ enum {
 @property (nonatomic, readonly) NSManagedObjectContext *mainThreadManagedObjectContext;
 @property (nonatomic, readonly) NSManagedObjectContext *backgroundThreadManagedObjectContext;
 
+/**
+ returns a new NSManagedObjectContext instance which is observed by this CoreData stack and automatically merges changes between all other observing contexts. Observation ends iff the NSManagedObjectContext gets dealloced.
+ */
+- (NSManagedObjectContext *)newManagedObjectContextWithConcurrencyType:(NSManagedObjectContextConcurrencyType)concurrencyType;
+
 - (instancetype)init NS_DESIGNATED_INITIALIZER NS_UNAVAILABLE;
 - (instancetype)initWithType:(NSString *)storeType location:(NSURL *)storeLocation model:(NSURL *)modelURL inBundle:(NSBundle *)bundle NS_DESIGNATED_INITIALIZER;
 
