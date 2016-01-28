@@ -100,13 +100,6 @@ NSString *const SLCoreDataStackErrorDomain = @"SLCoreDataStackErrorDomain";
 
 
 
-@interface SLCoreDataStack ()
-
-@property (nonatomic, strong) NSPointerArray *observingManagedObjectContexts;
-
-@end
-
-
 @implementation SLCoreDataStack
 @synthesize mainThreadManagedObjectContext = _mainThreadManagedObjectContext, backgroundThreadManagedObjectContext = _backgroundThreadManagedObjectContext, managedObjectModel = _managedObjectModel, persistentStoreCoordinator = _persistentStoreCoordinator;
 
@@ -162,8 +155,6 @@ NSString *const SLCoreDataStackErrorDomain = @"SLCoreDataStackErrorDomain";
         _storeType = storeType;
         _managedObjectModelURL = modelURL;
         _bundle = bundle;
-
-        _observingManagedObjectContexts = [NSPointerArray pointerArrayWithOptions:NSPointerFunctionsWeakMemory];
 
         NSString *parentDirectory = storeLocation.URLByDeletingLastPathComponent.path;
         if (![[NSFileManager defaultManager] fileExistsAtPath:parentDirectory isDirectory:NULL]) {
@@ -278,40 +269,6 @@ NSString *const SLCoreDataStackErrorDomain = @"SLCoreDataStackErrorDomain";
     return _persistentStoreCoordinator;
 }
 
-- (NSManagedObjectContext *)newManagedObjectContextWithConcurrencyType:(NSManagedObjectContextConcurrencyType)concurrencyType
-{
-    NSManagedObjectContext *context = [[NSManagedObjectContext alloc] initWithConcurrencyType:concurrencyType];
-    context.persistentStoreCoordinator = self.persistentStoreCoordinator;
-    context.mergePolicy = self.backgroundThreadMergePolicy;
-
-    [self.observingManagedObjectContexts addPointer:(__bridge void *)context];
-
-    __weak typeof(self) weakSelf = self;
-    [context SLCoreDataStack_addDeallocationHandler:^(NSManagedObjectContext *__unsafe_unretained context) {
-        __strong typeof(weakSelf) strongSelf = weakSelf;
-
-        NSUInteger index = NSNotFound;
-
-        for (NSUInteger i = 0; i < strongSelf.observingManagedObjectContexts.count; i++) {
-            void *pointer = [strongSelf.observingManagedObjectContexts pointerAtIndex:i];
-
-            if (pointer == (__bridge void *)context) {
-                index = i;
-                break;
-            }
-        }
-
-        if (index != NSNotFound) {
-            [strongSelf.observingManagedObjectContexts removePointerAtIndex:index];
-        }
-
-        [[NSNotificationCenter defaultCenter] removeObserver:self name:NSManagedObjectContextDidSaveNotification object:context];
-    }];
-
-    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(_managedObjectContextDidSaveNotificationCallback:) name:NSManagedObjectContextDidSaveNotification object:context];
-
-    return context;
-}
 
 #pragma mark - private implementation ()
 
@@ -327,12 +284,6 @@ NSString *const SLCoreDataStackErrorDomain = @"SLCoreDataStackErrorDomain";
     NSManagedObjectContext *backgroundThreadManagedObjectContext = self.backgroundThreadManagedObjectContext;
     if (backgroundThreadManagedObjectContext) {
         [observingManagedObjectsContexts addObject:backgroundThreadManagedObjectContext];
-    }
-
-    for (NSManagedObjectContext *context in self.observingManagedObjectContexts) {
-        if (context) {
-            [observingManagedObjectsContexts addObject:context];
-        }
     }
 
     return observingManagedObjectsContexts;
